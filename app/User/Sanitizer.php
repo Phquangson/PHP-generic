@@ -2,20 +2,20 @@
 
 declare(strict_types=1);
 
-namespace App\Sanitizer;
+namespace App\User;
 
 use App\Exceptions\ValidationException;
-use App\Sanitizer\Contracts\TypeHandler;
-use App\Sanitizer\Types\BoolType;
-use App\Sanitizer\Types\DateType;
-use App\Sanitizer\Types\EmailType;
-use App\Sanitizer\Types\FloatType;
-use App\Sanitizer\Types\IntType;
-use App\Sanitizer\Types\JsonType;
-use App\Sanitizer\Types\StringType;
+use App\User\Contracts\TypeHandler;
+use App\User\Types\BoolType;
+use App\User\Types\DateType;
+use App\User\Types\EmailType;
+use App\User\Types\FloatType;
+use App\User\Types\IntType;
+use App\User\Types\JsonType;
+use App\User\Types\StringType;
 use InvalidArgumentException;
 
-final class Sanitizer
+final class User
 {
     /** @var array<string, TypeHandler> */
     private array $types = [];

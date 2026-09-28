@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Sanitizer\Types;
+namespace App\User\Types;
 
 use InvalidArgumentException;
 
@@ -13,7 +13,7 @@ final class IntType extends NumberType
         $number = filter_var($value, FILTER_VALIDATE_INT);
 
         if ($number === false) {
-            throw new InvalidArgumentException('Phải là số nguyên');
+            throw new InvalidArgumentException('Tuổi phải là số nguyên');
         }
 
         return $this->checkRange($number, $rule);

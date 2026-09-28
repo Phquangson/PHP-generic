@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Sanitizer\Contracts;
+namespace App\User\Contracts;
 
 interface TypeHandler
 {

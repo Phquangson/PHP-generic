@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Sanitizer\Types;
+namespace App\User\Types;
 
 use InvalidArgumentException;
 

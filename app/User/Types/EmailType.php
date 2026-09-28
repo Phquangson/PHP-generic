@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Sanitizer\Types;
+namespace App\User\Types;
 
-use App\Sanitizer\Contracts\TypeHandler;
+use App\User\Contracts\TypeHandler;
 use InvalidArgumentException;
 
 final class EmailType implements TypeHandler
