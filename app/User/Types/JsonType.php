@@ -4,25 +4,46 @@ declare(strict_types=1);
 
 namespace App\User\Types;
 
-use App\User\Contracts\TypeHandler;
 use InvalidArgumentException;
 
-final class JsonType implements TypeHandler
+final class IntType extends NumberType
 {
-    public function handle(mixed $value, array $rule): string
+    public function handle(mixed $value, array $rule): int
     {
-        $json = is_string($value) ? $value : json_encode($value, JSON_UNESCAPED_UNICODE);
+        $isRequired = $rule['required'] ?? true;
 
-        if ($json === false) {
-            throw new InvalidArgumentException('JSON không hợp lệ');
+        if ($this->isBlank($value)) {
+            return $this->handleEmpty($isRequired);
         }
 
-        json_decode($json);
+        $number = $this->toInt($value);
 
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new InvalidArgumentException('JSON không hợp lệ');
+        return $this->checkRange($number, $rule);
+    }
+
+    private function isBlank(mixed $value): bool
+    {
+        return $value === null
+            || (is_string($value) && trim($value) === '');
+    }
+
+    private function handleEmpty(bool $isRequired): int
+    {
+        if ($isRequired) {
+            throw new InvalidArgumentException('Vui lòng nhập số, không được để trống');
         }
 
-        return $json;
+        return 0;
+    }
+
+    private function toInt(mixed $value): int
+    {
+        $number = filter_var($value, FILTER_VALIDATE_INT);
+
+        if ($number === false) {
+            throw new InvalidArgumentException('Phải là số nguyên');
+        }
+
+        return $number;
     }
 }

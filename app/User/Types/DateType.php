@@ -10,20 +10,59 @@ use InvalidArgumentException;
 
 final class DateType implements TypeHandler
 {
+    private const DEFAULT_FORMAT = 'Y-m-d';
+
     public function handle(mixed $value, array $rule): string
     {
-        $format = $rule['format'] ?? 'Y-m-d';
+        $isRequired = $rule['required'] ?? true;
 
-        $date = is_scalar($value)
-            ? DateTimeImmutable::createFromFormat('!' . $format, (string) $value)
-            : false;
-
-        $errors = DateTimeImmutable::getLastErrors();
-
-        if ($date === false || ($errors && ($errors['warning_count'] || $errors['error_count']))) {
-            throw new InvalidArgumentException("Ngày không đúng định dạng $format");
+        if ($this->isBlank($value)) {
+            return $this->handleEmpty($isRequired);
         }
 
-        return $date->format($rule['output'] ?? $format);
+        $inputFormat  = $rule['format'] ?? self::DEFAULT_FORMAT;
+        $outputFormat = $rule['output'] ?? $inputFormat;
+
+        $date = $this->parseDate($value, $inputFormat);
+
+        return $date->format($outputFormat);
+    }
+
+    private function isBlank(mixed $value): bool
+    {
+        return $value === null
+            || (is_string($value) && trim($value) === '');
+    }
+
+    private function handleEmpty(bool $isRequired): string
+    {
+        if ($isRequired) {
+            throw new InvalidArgumentException('Vui lòng chọn ngày, không được để trống');
+        }
+
+        return '';
+    }
+
+    private function parseDate(mixed $value, string $format): DateTimeImmutable
+    {
+        if (!is_scalar($value)) {
+            throw new InvalidArgumentException("Ngày không đúng định dạng {$format}");
+        }
+
+        $date = DateTimeImmutable::createFromFormat('!' . $format, (string) $value);
+
+        if ($date === false || $this->hasParseErrors()) {
+            throw new InvalidArgumentException("Ngày không đúng định dạng {$format}");
+        }
+
+        return $date;
+    }
+
+    private function hasParseErrors(): bool
+    {
+        $errors = DateTimeImmutable::getLastErrors();
+
+        return $errors !== false
+            && ($errors['warning_count'] > 0 || $errors['error_count'] > 0);
     }
 }

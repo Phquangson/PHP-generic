@@ -17,10 +17,89 @@ use InvalidArgumentException;
 
 final class User
 {
+    private const DEFAULT_TYPE = 'string';
+    private const MESSAGE_REQUIRED = 'Bắt buộc phải có';
+    private const MESSAGE_NOT_ALLOWED = 'Giá trị không nằm trong danh sách cho phép';
+
     /** @var array<string, TypeHandler> */
-    private array $types = [];
+    private array $handlers = [];
 
     public function __construct()
+    {
+        $this->registerDefaultHandlers();
+    }
+
+    public function register(string $typeName, TypeHandler $handler): self
+    {
+        $this->handlers[$typeName] = $handler;
+
+        return $this;
+    }
+
+    public function sanitizeValue(mixed $value, array $rule): mixed
+    {
+        $typeName = $rule['type'] ?? self::DEFAULT_TYPE;
+        $handler = $this->resolveHandler($typeName);
+
+        $value = $this->trimIfNeeded($value, $rule);
+        $result = $handler->handle($value, $rule);
+
+        $this->assertAllowed($result, $rule);
+
+        return $result;
+    }
+
+    public function sanitize(array $data, array $rules): array
+    {
+        $cleanData = [];
+        $errors = [];
+
+        foreach ($rules as $field => $rule) {
+            $rule = $this->normalizeRule($rule);
+            $value = $this->nullIfBlank($data[$field] ?? null);
+
+            if ($value === null) {
+                if (array_key_exists('default', $rule)) {
+                    $cleanData[$field] = $rule['default'];
+                } elseif ($rule['required'] ?? false) {
+                    $errors[$field] = self::MESSAGE_REQUIRED;
+                } elseif (array_key_exists($field, $data)) {
+                    $cleanData[$field] = null;
+                }
+                continue;
+            }
+
+            try {
+                $cleanData[$field] = $this->sanitizeValue($value, $rule);
+            } catch (InvalidArgumentException $exception) {
+                $errors[$field] = $exception->getMessage();
+            }
+        }
+
+        $this->throwIfHasErrors($errors);
+
+        return $cleanData;
+    }
+
+    public function sanitizeMany(array $rows, array $rules): array
+    {
+        $cleanRows = [];
+        $errorsByRow = [];
+
+        foreach ($rows as $index => $row) {
+            try {
+                $cleanRows[$index] = $this->sanitize($row, $rules);
+            } catch (ValidationException $exception) {
+                $errorsByRow[$index] = $exception->errors();
+            }
+        }
+
+        $this->throwIfHasErrors($errorsByRow);
+
+        return $cleanRows;
+    }
+
+    private function registerDefaultHandlers(): void
     {
         $this->register('string', new StringType());
         $this->register('int', new IntType());
@@ -31,90 +110,45 @@ final class User
         $this->register('json', new JsonType());
     }
 
-    public function register(string $name, TypeHandler $handler): self
+    private function resolveHandler(string $typeName): TypeHandler
     {
-        $this->types[$name] = $handler;
-
-        return $this;
-    }
-
-    public function sanitizeValue(mixed $value, array $rule): mixed
-    {
-        $type = $rule['type'] ?? 'string';
-
-        if (!isset($this->types[$type])) {
-            throw new InvalidArgumentException("Không hỗ trợ type '$type'");
+        if (!isset($this->handlers[$typeName])) {
+            throw new InvalidArgumentException("Không hỗ trợ type '{$typeName}'");
         }
 
+        return $this->handlers[$typeName];
+    }
+
+    private function normalizeRule(array|string $rule): array
+    {
+        return is_string($rule) ? ['type' => $rule] : $rule;
+    }
+
+    private function nullIfBlank(mixed $value): mixed
+    {
+        return is_string($value) && trim($value) === '' ? null : $value;
+    }
+
+    private function trimIfNeeded(mixed $value, array $rule): mixed
+    {
         if (is_string($value) && ($rule['trim'] ?? true)) {
-            $value = trim($value);
+            return trim($value);
         }
 
-        $result = $this->types[$type]->handle($value, $rule);
+        return $value;
+    }
 
+    private function assertAllowed(mixed $result, array $rule): void
+    {
         if (isset($rule['in']) && !in_array($result, $rule['in'], true)) {
-            throw new InvalidArgumentException('Giá trị không nằm trong danh sách cho phép');
+            throw new InvalidArgumentException(self::MESSAGE_NOT_ALLOWED);
         }
-
-        return $result;
     }
 
-    public function sanitize(array $data, array $rules): array
+    private function throwIfHasErrors(array $errors): void
     {
-        $clean = [];
-        $errors = [];
-
-        foreach ($rules as $field => $rule) {
-            $rule = is_string($rule) ? ['type' => $rule] : $rule;
-            $exists = array_key_exists($field, $data);
-            $value = $data[$field] ?? null;
-
-            if (is_string($value) && trim($value) === '') {
-                $value = null;
-            }
-
-            if ($value === null) {
-                if (array_key_exists('default', $rule)) {
-                    $clean[$field] = $rule['default'];
-                } elseif ($rule['required'] ?? false) {
-                    $errors[$field] = 'Bắt buộc phải có';
-                } elseif ($exists) {
-                    $clean[$field] = null;
-                }
-                continue;
-            }
-
-            try {
-                $clean[$field] = $this->sanitizeValue($value, $rule);
-            } catch (InvalidArgumentException $e) {
-                $errors[$field] = $e->getMessage();
-            }
-        }
-
         if ($errors) {
             throw new ValidationException($errors);
         }
-
-        return $clean;
-    }
-
-    public function sanitizeMany(array $rows, array $rules): array
-    {
-        $result = [];
-        $errors = [];
-
-        foreach ($rows as $i => $row) {
-            try {
-                $result[$i] = $this->sanitize($row, $rules);
-            } catch (ValidationException $e) {
-                $errors[$i] = $e->errors();
-            }
-        }
-
-        if ($errors) {
-            throw new ValidationException($errors);
-        }
-
-        return $result;
     }
 }
